@@ -1,4 +1,4 @@
-package com.trt;
+package com.trt.framework;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

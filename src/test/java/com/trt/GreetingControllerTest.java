@@ -1,5 +1,6 @@
 package com.trt;
 
+import com.trt.framework.GreetingController;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
