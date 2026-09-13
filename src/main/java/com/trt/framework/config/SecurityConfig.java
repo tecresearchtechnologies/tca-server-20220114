@@ -1,4 +1,4 @@
-package com.trt.config;
+package com.trt.framework.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

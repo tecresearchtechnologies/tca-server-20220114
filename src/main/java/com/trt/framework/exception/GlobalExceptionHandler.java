@@ -1,4 +1,4 @@
-package com.trt.exception;
+package com.trt.framework.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

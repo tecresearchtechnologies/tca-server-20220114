@@ -1,4 +1,4 @@
-package com.trt.exception;
+package com.trt.framework.exception;
 
 public class ResourceNotFoundException extends RuntimeException {
     public ResourceNotFoundException(String message) {

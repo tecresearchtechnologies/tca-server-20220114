@@ -1,4 +1,4 @@
-package com.trt.exception;
+package com.trt.framework.exception;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;

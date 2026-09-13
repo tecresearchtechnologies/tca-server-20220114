@@ -1,4 +1,4 @@
-package com.trt.dto;
+package com.trt.framework.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
