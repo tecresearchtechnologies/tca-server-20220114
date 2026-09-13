@@ -2,15 +2,7 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <springProperty name="LOG_FILE_PATH" source="logging.file.path" defaultValue="logs"/>
-    <springProperty name="LOG_LEVEL" source="logging.level.root" defaultValue="INFO"/>
-
-    <!-- Console Appender -->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
+    <springProperty name="LOG_FILE_PATH" source="logging.file.path" defaultValue="/var/logs"/>
 
     <!-- File Appender -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -20,9 +12,9 @@
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>${LOG_FILE_PATH}/application.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>30</maxHistory>
-            <totalSizeCap>1GB</totalSizeCap>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>90</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
         </rollingPolicy>
     </appender>
 
@@ -39,32 +31,18 @@
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>${LOG_FILE_PATH}/error.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>30</maxHistory>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>90</maxHistory>
         </rollingPolicy>
     </appender>
 
-    <!-- Spring Profiles -->
-    <springProfile name="local">
-        <root level="DEBUG">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="FILE"/>
-            <appender-ref ref="ERROR_FILE"/>
-        </root>
-    </springProfile>
+    <!-- Production: WARN level with file logging only (no console) -->
+    <root level="WARN">
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
 
-    <springProfile name="prod">
-        <root level="WARN">
-            <appender-ref ref="FILE"/>
-            <appender-ref ref="ERROR_FILE"/>
-        </root>
-    </springProfile>
-
-    <springProfile name="!local,!prod">
-        <root level="${LOG_LEVEL}">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="FILE"/>
-            <appender-ref ref="ERROR_FILE"/>
-        </root>
-    </springProfile>
+    <logger name="com.trt" level="INFO"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.springframework.security" level="WARN"/>
 </configuration>
