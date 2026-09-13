@@ -9,8 +9,56 @@ target/
 *.iml
 .vscode/
 
+# Secrets and credentials
+vars/secrets/
+vars/secrets/*
+vars/**/*secrets*
+vars/**/*password*
+vars/**/*key*
+vars/**/*token*
+vars/**/*credential*
+!vars/secrets/README.md
+!vars/secrets/*.example
+
+# Local override files
+application-local.properties
+application-prod.properties
+application-docker.properties
+
+# CI/CD local configs
+.github/secrets/
+.jenkins/secrets/
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
 src/main/resources/static/**
 !src/main/resources/static/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime
+pids/
+*.pid
+*.seed
+*.pid.lock
