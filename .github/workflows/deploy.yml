@@ -1,0 +1,152 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Docker image tag to deploy
+        required: false
+        default: latest
+  workflow_run:
+    workflows:
+      - CI/CD
+    branches:
+      - main
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  # Only deploy after CI/CD succeeds (when triggered via workflow_run)
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+
+      - name: Connect to Tailscale
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        run: |
+          sudo tailscale up \
+            --authkey "$TAILSCALE_AUTHKEY" \
+            --accept-dns=true \
+            --accept-routes=true \
+            --hostname github-actions-deploy
+          tailscale status
+
+      - name: Determine image tag
+        id: image_tag
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "image_tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+            echo "Source: Manual dispatch with tag: ${{ inputs.image_tag }}"
+          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            echo "image_tag=sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "Source: Push event with SHA: ${{ github.sha }}"
+          elif [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            echo "image_tag=sha-${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "Source: Workflow run with SHA: ${{ github.event.workflow_run.head_sha }}"
+          else
+            echo "image_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "Source: Unknown event, using latest"
+          fi
+
+      - name: Deploy Docker image to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/demo-app
+          IMAGE_TAG: ${{ steps.image_tag.outputs.image_tag }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          envs: IMAGE_NAME,IMAGE_TAG,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          script: |
+            set -e
+
+            echo "=== Docker Login ==="
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            
+            echo "=== Pulling image: $IMAGE_NAME:$IMAGE_TAG ==="
+            docker pull "$IMAGE_NAME:$IMAGE_TAG"
+            
+            echo "=== Stopping old container ==="
+            if [ "$(docker ps -aq -f name=demo-app)" ]; then
+              echo "Stopping existing demo-app container..."
+              docker stop demo-app || true
+              sleep 2
+              if [ "$(docker ps -aq -f name=demo-app)" ]; then
+                echo "Force killing demo-app..."
+                docker kill demo-app || true
+              fi
+              sleep 2
+              echo "Removing demo-app container..."
+              docker rm demo-app -f || true
+              sleep 2
+            else
+              echo "No existing demo-app container found"
+            fi
+            
+            echo "=== Verifying port 8080 is free ==="
+            if netstat -tlnp 2>/dev/null | grep -q ":8080"; then
+              echo "⚠️  Port 8080 is still in use, forcefully freeing it..."
+              PID=$(netstat -tlnp 2>/dev/null | grep ":8080" | awk '{print $NF}' | cut -d'/' -f1)
+              if [ -n "$PID" ]; then
+                kill -9 $PID || true
+              fi
+              sleep 2
+            fi
+            echo "✅ Port 8080 is free"
+            
+            echo "=== Starting new container ==="
+            docker run -d \
+              --name demo-app \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -e JAVA_OPTS="-Xms256m -Xmx512m -Djava.security.egd=file:/dev/./urandom" \
+              "$IMAGE_NAME:$IMAGE_TAG"
+            
+            echo "✅ Container started successfully"
+            sleep 3
+            
+            echo "=== Waiting for application to be healthy ==="
+            for i in {1..30}; do
+              if docker exec demo-app curl -f http://localhost:8080/api/greeting > /dev/null 2>&1; then
+                echo "✅ Application is healthy on attempt $i!"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "❌ Application failed to become healthy after 30 attempts"
+                echo "=== Container logs ==="
+                docker logs demo-app || true
+                echo "=== Running processes ==="
+                docker ps -a || true
+                exit 1
+              fi
+              echo "Attempt $i: Waiting for application to start..."
+              sleep 1
+            done
+            
+            echo "=== Cleaning up old images ==="
+            docker image prune -f || true
+            
+            echo "=== Final container status ==="
+            docker ps --filter "name=demo-app"
+            
+            echo "✅ Deployment completed successfully!"
+
